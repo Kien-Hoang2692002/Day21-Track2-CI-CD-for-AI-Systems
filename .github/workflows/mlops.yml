@@ -54,22 +54,17 @@ jobs:
 
       - name: Setup credentials and pull data
         env:
-          CLOUD_CREDENTIALS_B64: ${{ secrets.CLOUD_CREDENTIALS }}
+          CLOUD_CREDENTIALS: ${{ secrets.CLOUD_CREDENTIALS }}
         run: |
           echo "=== Running commit: $(git rev-parse --short HEAD) ==="
-          # Ghi JSON trực tiếp ra file qua python để tránh shell escaping
+          # Ghi JSON ra file qua python để tránh shell escaping
           python -c "
           import os, json
-          raw = os.environ['CLOUD_CREDENTIALS_B64']
-          # Thử parse trực tiếp (JSON thô)
-          try:
-              d = json.loads(raw)
-              with open('/tmp/sa-key.json', 'w') as f:
-                  json.dump(d, f)
-              print('=== SA:', d['client_email'], '===')
-          except Exception as e:
-              print('JSON parse error:', e)
-              raise
+          raw = os.environ['CLOUD_CREDENTIALS']
+          d = json.loads(raw)
+          with open('/tmp/sa-key.json', 'w') as f:
+              json.dump(d, f)
+          print('=== SA:', d['client_email'], '===')
           "
           # Set credentialpath trong DVC local config
           dvc remote modify --local myremote credentialpath /tmp/sa-key.json
