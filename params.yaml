@@ -1,5 +1,5 @@
-# Sieu tham so cho mo hinh RandomForestClassifier
-# Thay doi cac gia tri nay giua cac lan chay de thi nghiem (Buoc 1)
-n_estimators: 100
-max_depth: 5
+# Siêu tham số tốt nhất từ thí nghiệm Bước 1
+# Accuracy: 0.6700 | F1: 0.6685
+n_estimators: 300
+max_depth: 15
 min_samples_split: 2

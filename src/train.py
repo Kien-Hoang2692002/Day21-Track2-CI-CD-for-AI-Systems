@@ -15,67 +15,58 @@ def train(
     params: dict,
     data_path: str = "data/train_phase1.csv",
     eval_path: str = "data/eval.csv",
+    use_mlflow: bool = True
 ) -> float:
     """
-    Huan luyen mo hinh va ghi nhan ket qua vao MLflow.
-
-    Tham so:
-        params     : dict chua cac sieu tham so cho RandomForestClassifier.
-        data_path  : duong dan den file du lieu huan luyen.
-        eval_path  : duong dan den file du lieu danh gia.
-
-    Tra ve:
-        accuracy (float): do chinh xac tren tap danh gia.
+    Huấn luyện mô hình và ghi nhận kết quả vào MLflow (tùy chọn).
     """
 
-    # TODO 1: Doc du lieu huan luyen va danh gia
-    # df_train = ...
-    # df_eval  = ...
+    # Đọc dữ liệu huấn luyện và đánh giá
+    df_train = pd.read_csv(data_path)
+    df_eval = pd.read_csv(eval_path)
 
-    # TODO 2: Tach dac trung (X) va nhan (y)
-    # X_train = df_train.drop(columns=["target"])
-    # y_train = ...
-    # X_eval  = ...
-    # y_eval  = ...
+    # Tách đặc trưng và nhãn
+    X_train = df_train.drop("target", axis=1)
+    y_train = df_train["target"]
+    X_eval = df_eval.drop("target", axis=1)
+    y_eval = df_eval["target"]
 
-    with mlflow.start_run():
+    # Khởi tạo mô hình
+    model = RandomForestClassifier(**params, random_state=42)
+    model.fit(X_train, y_train)
 
-        # TODO 3: Ghi nhan cac sieu tham so
-        # mlflow.log_params(...)
+    # Tính accuracy và f1_score
+    preds = model.predict(X_eval)
+    acc = accuracy_score(y_eval, preds)
+    f1 = f1_score(y_eval, preds, average="weighted")
 
-        # TODO 4: Khoi tao va huan luyen RandomForestClassifier
-        # Goi y: su dung random_state=42 de dam bao tinh tai tao
-        # model = RandomForestClassifier(...)
-        # model.fit(...)
+    # In kết quả ra màn hình
+    print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
 
-        # TODO 5: Du doan tren tap danh gia va tinh chi so
-        # preds = ...
-        # acc   = accuracy_score(...)
-        # f1    = f1_score(..., average="weighted")
+    # Ghi nhận kết quả vào MLflow nếu được yêu cầu
+    if use_mlflow:
+        # Thiết lập MLflow tracking URI nếu chưa được set trong env
+        if not os.environ.get("MLFLOW_TRACKING_URI"):
+            mlflow.set_tracking_uri("sqlite:///mlflow.db")
+        
+        if not os.environ.get("MLFLOW_ARTIFACT_ROOT"):
+            os.environ["MLFLOW_ARTIFACT_ROOT"] = "./mlartifacts"
 
-        # TODO 6: Ghi nhan chi so vao MLflow
-        # mlflow.log_metric("accuracy", ...)
-        # mlflow.log_metric("f1_score", ...)
-        # mlflow.sklearn.log_model(model, "model")
+        with mlflow.start_run():
+            mlflow.log_params(params)
+            mlflow.log_metric("accuracy", acc)
+            mlflow.log_metric("f1_score", f1)
+            mlflow.sklearn.log_model(model, "model")
 
-        # TODO 7: In ket qua ra man hinh
-        # print(f"Accuracy: {acc:.4f} | F1: {f1:.4f}")
+    # Lưu metrics và model ra file (luôn thực hiện để CI/CD có thể đọc)
+    os.makedirs("outputs", exist_ok=True)
+    with open("outputs/metrics.json", "w") as f:
+        json.dump({"accuracy": acc, "f1_score": f1}, f)
 
-        # TODO 8: Luu metrics ra file outputs/metrics.json
-        # File nay duoc doc boi GitHub Actions o Buoc 2
-        # os.makedirs("outputs", exist_ok=True)
-        # with open("outputs/metrics.json", "w") as f:
-        #     json.dump({"accuracy": acc, "f1_score": f1}, f)
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(model, "models/model.pkl")
 
-        # TODO 9: Luu mo hinh ra file models/model.pkl
-        # File nay duoc upload len GCS o Buoc 2
-        # os.makedirs("models", exist_ok=True)
-        # joblib.dump(model, "models/model.pkl")
-
-        pass  # xoa dong nay sau khi hoan thanh tat ca TODO ben tren
-
-    # TODO 10: Tra ve acc
-    # return acc
+    return acc
 
 
 if __name__ == "__main__":

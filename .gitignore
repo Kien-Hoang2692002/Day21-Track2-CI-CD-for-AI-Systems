@@ -1,5 +1,6 @@
 mlflow.db
 mlartifacts/
+mlruns/
 models/
 outputs/
 data/train_phase1.csv
@@ -9,5 +10,8 @@ sa-key.json
 .env
 .venv/
 __pycache__/
+google-cloud-sdk/
+google-cloud-cli-linux-x86_64.tar.gz
+GITHUB_SECRETS.txt
 *.pyc
 .DS_Store
