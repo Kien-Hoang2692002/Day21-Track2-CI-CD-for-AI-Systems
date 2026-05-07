@@ -61,8 +61,20 @@ jobs:
         run: |
           # Ghi credentials ra file
           echo "$CLOUD_CREDENTIALS" > /tmp/sa-key.json
-          # Xác nhận file hợp lệ
-          python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA:', d['client_email'])"
+          # Debug: kiểm tra file có hợp lệ không
+          echo "File size: $(wc -c < /tmp/sa-key.json) bytes"
+          python -c "
+          import json, sys
+          try:
+              d = json.load(open('/tmp/sa-key.json'))
+              print('JSON valid. type:', d.get('type'))
+              print('SA email:', d.get('client_email'))
+              print('project_id:', d.get('project_id'))
+          except Exception as e:
+              print('JSON INVALID:', e)
+              print('First 200 chars:', open('/tmp/sa-key.json').read()[:200])
+              sys.exit(1)
+          "
           # Export env var và pull ngay trong cùng shell
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
           dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
