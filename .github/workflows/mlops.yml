@@ -55,29 +55,34 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Authenticate to Cloud Storage
-        # Ghi credentials ra file tạm và set biến môi trường xác thực GCP
+      - name: Authenticate and Pull data with DVC
+        env:
+          CLOUD_CREDENTIALS: ${{ secrets.CLOUD_CREDENTIALS }}
         run: |
-          echo '${{ secrets.CLOUD_CREDENTIALS }}' > /tmp/sa-key.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
-
-      - name: Pull data with DVC
-        # Pull chỉ 2 file cần thiết cho training
-        run: dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
+          # Ghi credentials ra file
+          echo "$CLOUD_CREDENTIALS" > /tmp/sa-key.json
+          # Xác nhận file hợp lệ
+          python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA:', d['client_email'])"
+          # Export env var và pull ngay trong cùng shell
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+          dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
 
       - name: Train model
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
         run: python src/train.py
 
       - name: Read metrics
         id: read_metrics
-        # Đọc accuracy từ outputs/metrics.json và set thành output của job
         run: |
           ACC=$(python -c "import json; d=json.load(open('outputs/metrics.json')); print(d['accuracy'])")
           echo "accuracy=$ACC" >> $GITHUB_OUTPUT
           echo "Accuracy: $ACC"
 
       - name: Upload model to Cloud Storage
-        # Upload models/model.pkl lên GCS bucket
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
           python - <<'EOF'
           import os
@@ -90,8 +95,6 @@ jobs:
           blob.upload_from_filename("models/model.pkl")
           print(f"Model uploaded to gs://{bucket_name}/models/latest/model.pkl")
           EOF
-        env:
-          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
 
       - name: Save metrics as artifact
         uses: actions/upload-artifact@v4
