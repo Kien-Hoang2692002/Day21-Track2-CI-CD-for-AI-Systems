@@ -56,13 +56,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.CLOUD_CREDENTIALS }}
+        env:
+          CLOUD_CREDENTIALS_B64: ${{ secrets.CLOUD_CREDENTIALS }}
+        run: |
+          echo "$CLOUD_CREDENTIALS_B64" | base64 -d > /tmp/sa-key.json
+          python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA:', d['client_email'])"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
 
       - name: Pull data with DVC
         run: dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
-
       - name: Train model
         run: python src/train.py
 
