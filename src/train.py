@@ -72,4 +72,6 @@ def train(
 if __name__ == "__main__":
     with open("params.yaml") as f:
         params = yaml.safe_load(f)
-    train(params)
+    # Tắt MLflow khi chạy trong CI (biến CI=true được set tự động bởi GitHub Actions)
+    use_mlflow = os.environ.get("CI", "false").lower() != "true"
+    train(params, use_mlflow=use_mlflow)
