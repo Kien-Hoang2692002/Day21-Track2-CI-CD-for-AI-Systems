@@ -7,6 +7,7 @@ on:
       - 'data/**.dvc'
       - 'src/**.py'
       - 'params.yaml'
+      - '.github/workflows/mlops.yml'
   workflow_dispatch:
 
 jobs:
@@ -55,12 +56,16 @@ jobs:
         env:
           CLOUD_CREDENTIALS_B64: ${{ secrets.CLOUD_CREDENTIALS }}
         run: |
+          echo "=== Running commit: $(git rev-parse --short HEAD) ==="
           # Decode credentials từ base64
           echo "$CLOUD_CREDENTIALS_B64" | base64 -d > /tmp/sa-key.json
+          echo "=== Credentials file size: $(wc -c < /tmp/sa-key.json) bytes ==="
           # Validate JSON
-          python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA:', d['client_email'])"
+          python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('=== SA:', d['client_email'], '===')"
           # Set credentialpath trong DVC local config (không commit vào git)
           dvc remote modify --local myremote credentialpath /tmp/sa-key.json
+          echo "=== DVC config after modify ==="
+          cat .dvc/config.local || echo "(no local config)"
           # Pull data ngay trong cùng step
           dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
           # Set cho các step sau dùng google-cloud-storage SDK
