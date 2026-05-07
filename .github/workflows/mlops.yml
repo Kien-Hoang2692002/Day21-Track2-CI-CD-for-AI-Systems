@@ -55,33 +55,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Authenticate and Pull data with DVC
-        env:
-          CLOUD_CREDENTIALS: ${{ secrets.CLOUD_CREDENTIALS }}
-        run: |
-          # Ghi credentials ra file
-          echo "$CLOUD_CREDENTIALS" > /tmp/sa-key.json
-          # Debug: kiểm tra file có hợp lệ không
-          echo "File size: $(wc -c < /tmp/sa-key.json) bytes"
-          python -c "
-          import json, sys
-          try:
-              d = json.load(open('/tmp/sa-key.json'))
-              print('JSON valid. type:', d.get('type'))
-              print('SA email:', d.get('client_email'))
-              print('project_id:', d.get('project_id'))
-          except Exception as e:
-              print('JSON INVALID:', e)
-              print('First 200 chars:', open('/tmp/sa-key.json').read()[:200])
-              sys.exit(1)
-          "
-          # Export env var và pull ngay trong cùng shell
-          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
-          dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.CLOUD_CREDENTIALS }}
+
+      - name: Pull data with DVC
+        run: dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
 
       - name: Train model
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
         run: python src/train.py
 
       - name: Read metrics
@@ -93,7 +75,6 @@ jobs:
 
       - name: Upload model to Cloud Storage
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa-key.json
           CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
         run: |
           python - <<'EOF'
