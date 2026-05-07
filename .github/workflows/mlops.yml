@@ -142,14 +142,15 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             sudo systemctl restart mlops-serve
-            sleep 5
+            # Chờ lâu hơn vì service cần download model từ GCS (~15-20s)
+            sleep 25
             for i in 1 2 3; do
               if curl -sf http://localhost:8000/health; then
                 echo "Health check passed."
                 exit 0
               fi
-              echo "Attempt $i failed, retrying in 5s..."
-              sleep 5
+              echo "Attempt $i failed, retrying in 10s..."
+              sleep 10
             done
             echo "Health check failed after 3 attempts."
             exit 1
