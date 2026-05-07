@@ -13,8 +13,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 1 - UNIT TEST
-  # Chạy unit tests trên dữ liệu ảo (không cần kết nối cloud storage).
-  # Nếu có bất kỳ test nào thất bại, pipeline dừng lại ở đây.
   # ---------------------------------------------------------------------------
   test:
     name: Unit Test
@@ -35,8 +33,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 2 - TRAIN
-  # Xác thực cloud storage, pull dữ liệu bằng DVC, huấn luyện mô hình, upload artifact.
-  # Chỉ chạy khi Job 1 (Unit Test) hoàn thành thành công.
   # ---------------------------------------------------------------------------
   train:
     name: Train
@@ -55,16 +51,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Authenticate to Google Cloud
+      - name: Setup credentials and pull data
         env:
           CLOUD_CREDENTIALS_B64: ${{ secrets.CLOUD_CREDENTIALS }}
         run: |
+          # Decode credentials từ base64
           echo "$CLOUD_CREDENTIALS_B64" | base64 -d > /tmp/sa-key.json
+          # Validate JSON
           python -c "import json; d=json.load(open('/tmp/sa-key.json')); print('SA:', d['client_email'])"
+          # Set credentialpath trong DVC local config (không commit vào git)
+          dvc remote modify --local myremote credentialpath /tmp/sa-key.json
+          # Pull data ngay trong cùng step
+          dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
+          # Set cho các step sau dùng google-cloud-storage SDK
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
 
-      - name: Pull data with DVC
-        run: dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
       - name: Train model
         run: python src/train.py
 
@@ -100,9 +101,6 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 3 - EVAL
-  # Kiểm tra ngưỡng chất lượng (accuracy >= 0.70).
-  # Pipeline dừng lại ở đây nếu mô hình chưa đạt yêu cầu.
-  # Chỉ chạy khi Job 2 (Train) hoàn thành thành công.
   # ---------------------------------------------------------------------------
   eval:
     name: Eval
@@ -111,20 +109,17 @@ jobs:
     steps:
 
       - name: Check eval gate
-        # Nếu accuracy < 0.70 thì hủy deploy, ngược lại tiếp tục
         run: |
           python - <<'EOF'
           acc = float("${{ needs.train.outputs.accuracy }}")
           if acc < 0.70:
-              raise SystemExit(f"FAILED: accuracy {acc:.4f} < 0.70. Hủy deploy.")
-          print(f"PASSED: accuracy {acc:.4f} >= 0.70. Đang tiến hành deploy...")
+              raise SystemExit(f"FAILED: accuracy {acc:.4f} < 0.70. Huy deploy.")
+          print(f"PASSED: accuracy {acc:.4f} >= 0.70. Dang trien khai...")
           EOF
 
 
   # ---------------------------------------------------------------------------
   # JOB 4 - DEPLOY
-  # Triển khai lên VM qua SSH.
-  # Chỉ chạy khi Job 3 (Eval) hoàn thành thành công.
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy
@@ -139,13 +134,8 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
-            # Restart service để load model mới nhất từ GCS
             sudo systemctl restart mlops-serve
-
-            # Chờ server khởi động xong
             sleep 5
-
-            # Health check — thử tối đa 3 lần, mỗi lần cách nhau 5 giây
             for i in 1 2 3; do
               if curl -sf http://localhost:8000/health; then
                 echo "Health check passed."
@@ -154,6 +144,5 @@ jobs:
               echo "Attempt $i failed, retrying in 5s..."
               sleep 5
             done
-
             echo "Health check failed after 3 attempts."
             exit 1
