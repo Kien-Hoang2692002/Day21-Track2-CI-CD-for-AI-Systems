@@ -1,5 +1,5 @@
 # Siêu tham số tốt nhất từ thí nghiệm Bước 1
-# Accuracy: 0.6700 | F1: 0.6685
+# Accuracy: 0.6820 | F1: 0.6811
 n_estimators: 300
-max_depth: 15
+max_depth: null
 min_samples_split: 2
